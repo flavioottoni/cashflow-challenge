@@ -2,6 +2,8 @@
 
 Desafio técnico para **Arquiteto de Soluções**: sistema de controle de fluxo de caixa com lançamentos (débitos/créditos) e saldo diário consolidado.
 
+**Repositório:** https://github.com/flavioottoni/cashflow-challenge
+
 ## Decisões Arquiteturais Principais
 
 - **Microsserviços + CQRS + Event-Driven Architecture (EDA)**
