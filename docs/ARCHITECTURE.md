@@ -59,7 +59,9 @@ sequenceDiagram
 
     C->>GW: POST /entries (JWT)
     GW->>ES: Forward + x-merchant-id
-    ES->>DB: BEGIN; INSERT entry; INSERT outbox; COMMIT
+    ES->>DB: BEGIN transação
+    ES->>DB: INSERT entry + outbox
+    ES->>DB: COMMIT
     ES-->>C: 201 Created
     OB->>DB: Poll unpublished outbox
     OB->>MQ: Publish entry.created
