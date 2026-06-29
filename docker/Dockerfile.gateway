@@ -1,0 +1,23 @@
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY package.json package-lock.json* ./
+COPY libs/shared/package.json ./libs/shared/
+COPY apps/api-gateway/package.json ./apps/api-gateway/
+RUN npm install
+COPY tsconfig.base.json ./
+COPY libs ./libs
+COPY apps/api-gateway ./apps/api-gateway
+RUN npm run build -w @cashflow/shared
+RUN npm run build -w api-gateway
+
+FROM node:20-alpine
+WORKDIR /app
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/apps/api-gateway/dist ./apps/api-gateway/dist
+COPY --from=builder /app/apps/api-gateway/package.json ./apps/api-gateway/
+COPY --from=builder /app/libs/shared/dist ./libs/shared/dist
+COPY --from=builder /app/libs/shared/package.json ./libs/shared/
+COPY --from=builder /app/package.json ./
+ENV NODE_ENV=production
+EXPOSE 3000
+CMD ["node", "apps/api-gateway/dist/main.js"]

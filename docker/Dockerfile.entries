@@ -1,0 +1,23 @@
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY package.json package-lock.json* ./
+COPY libs/shared/package.json ./libs/shared/
+COPY apps/entries-service/package.json ./apps/entries-service/
+RUN npm install
+COPY tsconfig.base.json ./
+COPY libs ./libs
+COPY apps/entries-service ./apps/entries-service
+RUN npm run build -w @cashflow/shared
+RUN npm run build -w entries-service
+
+FROM node:20-alpine
+WORKDIR /app
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/apps/entries-service/dist ./apps/entries-service/dist
+COPY --from=builder /app/apps/entries-service/package.json ./apps/entries-service/
+COPY --from=builder /app/libs/shared/dist ./libs/shared/dist
+COPY --from=builder /app/libs/shared/package.json ./libs/shared/
+COPY --from=builder /app/package.json ./
+ENV NODE_ENV=production
+EXPOSE 3001
+CMD ["node", "apps/entries-service/dist/main.js"]

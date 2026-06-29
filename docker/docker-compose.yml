@@ -1,0 +1,97 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: cashflow
+      POSTGRES_PASSWORD: cashflow
+      POSTGRES_DB: cashflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cashflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: cashflow
+      RABBITMQ_DEFAULT_PASS: cashflow
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  entries-service:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.entries
+    ports:
+      - "3001:3001"
+    environment:
+      PORT: 3001
+      DATABASE_URL: postgresql://cashflow:cashflow@postgres:5432/cashflow
+      RABBITMQ_URL: amqp://cashflow:cashflow@rabbitmq:5672
+      SERVICE_NAME: entries-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  consolidated-service:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.consolidated
+    ports:
+      - "3002:3002"
+    environment:
+      PORT: 3002
+      DATABASE_URL: postgresql://cashflow:cashflow@postgres:5432/cashflow
+      RABBITMQ_URL: amqp://cashflow:cashflow@rabbitmq:5672
+      REDIS_URL: redis://redis:6379
+      SERVICE_NAME: consolidated-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  api-gateway:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.gateway
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      JWT_SECRET: dev-secret-change-in-production
+      ENTRIES_SERVICE_URL: http://entries-service:3001
+      CONSOLIDATED_SERVICE_URL: http://consolidated-service:3002
+      SERVICE_NAME: api-gateway
+    depends_on:
+      - entries-service
+      - consolidated-service
+
+volumes:
+  postgres_data:

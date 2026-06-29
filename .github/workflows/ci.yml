@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build shared library
+        run: npm run build -w @cashflow/shared
+
+      - name: Build services
+        run: |
+          npm run build -w entries-service
+          npm run build -w consolidated-service
+          npm run build -w api-gateway
+
+      - name: Unit tests
+        run: |
+          npm run test -w entries-service
+          npm run test -w consolidated-service
+          npm run test -w api-gateway
+
+      - name: Architecture tests
+        run: npx jest --config jest.config.js
+
+      - name: E2E tests (entries resilience)
+        run: npm run test:e2e -w entries-service
